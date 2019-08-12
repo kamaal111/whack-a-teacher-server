@@ -3,6 +3,7 @@ const Sse = require('json-sse')
 const cors = require('cors')
 const { json: bodyParser } = require('body-parser')
 const Sequelize = require('sequelize')
+const { hashSync, compareSync } = require('bcrypt')
 
 const app = express()
 const stream = new Sse()
@@ -45,7 +46,36 @@ app.get('/stream', async (req, res) => {
 app.post('/user', async (req, res) => {
   const { name, password } = req.body
 
-  const entity = await User.create({ name, password })
+  const findUser = await User.findAll({ where: { name } })
+
+  if (findUser.length > 0) {
+    const lobbys = await Lobby.findAll({ include: [User] })
+
+    const data = JSON.stringify(lobbys)
+
+    stream.updateInit(data)
+    stream.send(data)
+
+    return res.send({ data: 'BAD REQUEST' })
+  }
+
+  await User.create({ name, password: hashSync(password, 10) })
+
+  const lobbys = await Lobby.findAll({ include: [User] })
+
+  const data = JSON.stringify(lobbys)
+
+  stream.updateInit(data)
+  stream.send(data)
+
+  return res.send({ data: 'OK' })
+})
+
+// Login User
+app.post('/login', async (req, res) => {
+  const { name, password } = req.body
+
+  const user = await User.findOne({ where: { name } })
   const lobbys = await Lobby.findAll({ include: [User] })
 
   const data = JSON.stringify(lobbys)
