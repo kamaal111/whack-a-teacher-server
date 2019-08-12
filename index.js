@@ -3,7 +3,7 @@ const Sse = require('json-sse')
 const cors = require('cors')
 const { json: bodyParser } = require('body-parser')
 const Sequelize = require('sequelize')
-const { hashSync, compareSync } = require('bcrypt')
+const { hashSync, compare } = require('bcrypt')
 
 const app = express()
 const stream = new Sse()
@@ -59,7 +59,7 @@ app.post('/user', async (req, res) => {
     return res.send({ data: 'BAD REQUEST' })
   }
 
-  await User.create({ name, password: hashSync(password, 10) })
+  const user = await User.create({ name, password: hashSync(password, 10) })
 
   const lobbys = await Lobby.findAll({ include: [User] })
 
@@ -68,22 +68,34 @@ app.post('/user', async (req, res) => {
   stream.updateInit(data)
   stream.send(data)
 
-  return res.send({ data: 'OK' })
+  return res.send({ data: 'OK', name: user.name, id: user.id })
 })
 
 // Login User
 app.post('/login', async (req, res) => {
   const { name, password } = req.body
 
-  const user = await User.findOne({ where: { name } })
-  const lobbys = await Lobby.findAll({ include: [User] })
+  const findUser = await User.findAll({ where: { name } })
 
+  const lobbys = await Lobby.findAll({ include: [User] })
   const data = JSON.stringify(lobbys)
 
   stream.updateInit(data)
   stream.send(data)
 
-  res.send(entity)
+  if (findUser.length > 0) {
+    return compare(password, findUser[0].password, (_err, response) => {
+      if (response === false) return res.send({ data: 'BAD REQUEST' })
+
+      return res.send({
+        data: 'OK',
+        name: findUser[0].name,
+        id: findUser[0].id
+      })
+    })
+  }
+
+  return res.send({ data: 'BAD REQUEST' })
 })
 
 // create lobby
@@ -102,7 +114,7 @@ app.post('/lobby', async (req, res) => {
 })
 
 // user in lobby
-app.put('/user/:userId/lobby/', async (req, res) => {
+app.put('/user/:userId', async (req, res) => {
   const { userId } = req.params
   const { id } = req.body
 
