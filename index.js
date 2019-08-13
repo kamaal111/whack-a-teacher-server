@@ -144,19 +144,19 @@ app.post('/lobby', async (req, res) => {
   const { game } = req.body
   const header = req.headers['authorization ']
   const success = authenticate(header)
-  if (success) {
-    const entity = await Lobby.create({ game })
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
-    return res.send({ message: 'OK' })
-  }
+  // if (success) {
+  const entity = await Lobby.create({ game })
   const lobbys = await Lobby.findAll({ include: [User] })
   const data = JSON.stringify(lobbys)
   stream.updateInit(data)
   stream.send(data)
-  return res.send({ message: 'Not authorized' })
+  return res.send({ message: 'OK' })
+  // }
+  // const lobbys = await Lobby.findAll({ include: [User] })
+  // const data = JSON.stringify(lobbys)
+  // stream.updateInit(data)
+  // stream.send(data)
+  // return res.send({ message: 'Not authorized' })
 })
 
 // user in lobby
@@ -167,21 +167,21 @@ app.put('/user/:userId', async (req, res) => {
   const header = req.headers['authorization ']
   const success = authenticate(header)
   console.log('Success:', success)
-  if (success) {
-    await User.findByPk(userId).then(user => {
-      return user.update({ lobbyId })
-    })
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
-    return res.send({ message: 'OK' })
-  }
+  // if (success) {
+  await User.findByPk(userId).then(user => {
+    return user.update({ lobbyId })
+  })
   const lobbys = await Lobby.findAll({ include: [User] })
   const data = JSON.stringify(lobbys)
   stream.updateInit(data)
   stream.send(data)
-  res.send({ message: 'Not authorized' })
+  return res.send({ message: 'OK' })
+  // }
+  // const lobbys = await Lobby.findAll({ include: [User] })
+  // const data = JSON.stringify(lobbys)
+  // stream.updateInit(data)
+  // stream.send(data)
+  // res.send({ message: 'Not authorized' })
 })
 
 app.listen(port, () => console.log(`Listening ${port}`))
