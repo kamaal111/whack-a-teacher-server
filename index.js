@@ -51,9 +51,9 @@ const signJWT = (user, callback) => {
   const options = { expiresIn: '1d' }
 
   sign(payload, secret, options, (err, jwt) => {
-    if (err) callback({ data: 'BAD REQUEST' })
+    if (err) return callback({ data: 'BAD REQUEST' })
 
-    callback({
+    return callback({
       data: 'OK',
       name: user.name,
       id: user.id,
@@ -103,9 +103,14 @@ app.post('/login', async (req, res) => {
     const [user] = findUser
 
     return compare(password, user.password, (_err, response) => {
-      if (response === false) return res.send({ data: 'BAD REQUEST' })
+      if (response === false) {
+        return res.send({ data: 'BAD REQUEST' })
+      }
 
-      return signJWT(user, response => res.send(response))
+      return signJWT(user, response => {
+        console.log('response', response)
+        return res.send(response)
+      })
     })
   }
 
@@ -115,13 +120,15 @@ app.post('/login', async (req, res) => {
 // Authenticate header
 const authenticate = header => {
   const verifyJWT = token => {
-    return verify(token, process.env.PUBLIC_KEY, function(err, decoded) {
-      if (err) {
-        return false
-      } else {
-        return true
+    return verify(
+      token,
+      process.env.SECRET_KEY,
+      { expiresIn: '1d' },
+      (err, decode) => {
+        if (err !== null) return false
+        if (decode) return true
       }
-    })
+    )
   }
 
   console.log('Header:', header)
