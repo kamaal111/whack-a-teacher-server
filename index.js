@@ -16,7 +16,7 @@ const databaseUrl =
 
 const db = new Sequelize(databaseUrl)
 
-// require('dotenv').config()
+require('dotenv').config()
 
 db.sync({ force: false })
   .then(() => console.log('Database connected'))
@@ -115,7 +115,7 @@ app.post('/login', async (req, res) => {
 // Authenticate header
 const authenticate = header => {
   const verifyJWT = token => {
-    return verify(token, process.env.SECRET_KEY, function(err) {
+    return verify(token, process.env.PUBLIC_KEY, function(err, decoded) {
       if (err) {
         return false
       } else {
