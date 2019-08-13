@@ -45,6 +45,23 @@ app.get('/stream', async (req, res) => {
   stream.init(req, res)
 })
 
+const signJWT = (user, callback) => {
+  const payload = { name: user.name }
+  const secret = process.env.SECRET_KEY
+  const options = { expiresIn: '1d' }
+
+  sign(payload, secret, options, (err, jwt) => {
+    if (err) callback({ data: 'BAD REQUEST' })
+
+    callback({
+      data: 'OK',
+      name: user.name,
+      id: user.id,
+      token: jwt
+    })
+  })
+}
+
 // Create User
 app.post('/user', async (req, res) => {
   const { name, password } = req.body
@@ -67,7 +84,7 @@ app.post('/user', async (req, res) => {
   stream.updateInit(data)
   stream.send(data)
 
-  return res.send({ data: 'OK', name: user.name, id: user.id })
+  return signJWT(user, response => res.send(response))
 })
 
 // Login User
@@ -88,20 +105,7 @@ app.post('/login', async (req, res) => {
     return compare(password, user.password, (_err, response) => {
       if (response === false) return res.send({ data: 'BAD REQUEST' })
 
-      const payload = { name: user.name }
-      const secret = process.env.SECRET_KEY
-      const options = { expiresIn: '2d' }
-
-      sign(payload, secret, options, (err, jwt) => {
-        if (err) return res.send({ data: 'BAD REQUEST' })
-
-        return res.send({
-          data: 'OK',
-          name: user.name,
-          id: user.id,
-          token: jwt
-        })
-      })
+      return signJWT(user, response => res.send(response))
     })
   }
 
