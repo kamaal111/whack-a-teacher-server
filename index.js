@@ -4,6 +4,7 @@ const cors = require('cors')
 const { json: bodyParser } = require('body-parser')
 const Sequelize = require('sequelize')
 const { hashSync, compare } = require('bcrypt')
+const { sign, verify } = require('jsonwebtoken')
 
 const app = express()
 const stream = new Sse()
@@ -14,6 +15,8 @@ const databaseUrl =
   'postgres://postgres:password@localhost:5432/postgres'
 
 const db = new Sequelize(databaseUrl)
+
+require('dotenv').config()
 
 db.sync({ force: false })
   .then(() => console.log('Database connected'))
@@ -42,33 +45,46 @@ app.get('/stream', async (req, res) => {
   stream.init(req, res)
 })
 
+const signJWT = (user, callback) => {
+  const payload = { name: user.name }
+  const secret = process.env.SECRET_KEY
+  const options = { expiresIn: '1d' }
+
+  sign(payload, secret, options, (err, jwt) => {
+    if (err) callback({ data: 'BAD REQUEST' })
+
+    callback({
+      data: 'OK',
+      name: user.name,
+      id: user.id,
+      token: jwt
+    })
+  })
+}
+
 // Create User
 app.post('/user', async (req, res) => {
   const { name, password } = req.body
 
   const findUser = await User.findAll({ where: { name } })
-
-  if (findUser.length > 0) {
-    const lobbys = await Lobby.findAll({ include: [User] })
-
-    const data = JSON.stringify(lobbys)
-
-    stream.updateInit(data)
-    stream.send(data)
-
-    return res.send({ data: 'BAD REQUEST' })
-  }
-
-  const user = await User.create({ name, password: hashSync(password, 10) })
-
   const lobbys = await Lobby.findAll({ include: [User] })
 
   const data = JSON.stringify(lobbys)
 
+  if (findUser.length > 0) {
+    return res.send({ data: 'BAD REQUEST' })
+  }
+
+  const hashingSaltingRounds = 10
+  const user = await User.create({
+    name,
+    password: hashSync(password, hashingSaltingRounds)
+  })
+
   stream.updateInit(data)
   stream.send(data)
 
-  return res.send({ data: 'OK', name: user.name, id: user.id })
+  return signJWT(user, response => res.send(response))
 })
 
 // Login User
@@ -84,14 +100,12 @@ app.post('/login', async (req, res) => {
   stream.send(data)
 
   if (findUser.length > 0) {
-    return compare(password, findUser[0].password, (_err, response) => {
+    const [user] = findUser
+
+    return compare(password, user.password, (_err, response) => {
       if (response === false) return res.send({ data: 'BAD REQUEST' })
 
-      return res.send({
-        data: 'OK',
-        name: findUser[0].name,
-        id: findUser[0].id
-      })
+      return signJWT(user, response => res.send(response))
     })
   }
 
@@ -116,11 +130,11 @@ app.post('/lobby', async (req, res) => {
 // user in lobby
 app.put('/user/:userId', async (req, res) => {
   const { userId } = req.params
-  const { id } = req.body
+  const { id: lobbyId } = req.body
 
-  const userInLobby = await User.findByPk(userId).then(user =>
-    user.update({ lobbyId: id })
-  )
+  const userInLobby = await User.findByPk(userId).then(user => {
+    return user.update({ lobbyId })
+  })
 
   const data = JSON.stringify(userInLobby)
 
