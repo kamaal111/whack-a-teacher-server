@@ -112,19 +112,44 @@ app.post('/login', async (req, res) => {
   return res.send({ data: 'BAD REQUEST' })
 })
 
+// Authenticate header
+const authenticate = header => {
+  const verifyJWT = token => {
+    return verify(token, process.env.SECRET_KEY, function(err) {
+      if (err) {
+        return false
+      } else {
+        return true
+      }
+    })
+  }
+
+  if (header && header.startsWith('Bearer')) {
+    const [ , token ] = header.split(' ')
+    const success = verifyJWT(token)
+    return success
+  }
+}
+
 // create lobby
 app.post('/lobby', async (req, res) => {
   const { game } = req.body
-
-  const entity = await Lobby.create({ game })
-  const lobbys = await Lobby.findAll({ include: [User] })
-
-  const data = JSON.stringify(lobbys)
-
-  stream.updateInit(data)
-  stream.send(data)
-
-  res.send(entity)
+  const header = req.headers['authorization ']
+  const success = authenticate(header)
+    console.log(success)
+    if (success) {
+      const entity = await Lobby.create({ game })
+      const lobbys = await Lobby.findAll({ include: [User] })
+      const data = JSON.stringify(lobbys)
+      stream.updateInit(data)
+      stream.send(data)
+      return res.send(entity)
+    }
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+    return res.send({ message: 'Not authorized' })
 })
 
 // user in lobby
