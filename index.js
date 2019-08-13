@@ -16,7 +16,7 @@ const databaseUrl =
 
 const db = new Sequelize(databaseUrl)
 
-require('dotenv').config()
+// require('dotenv').config()
 
 db.sync({ force: false })
   .then(() => console.log('Database connected'))
@@ -126,7 +126,7 @@ const authenticate = header => {
 
   console.log('Header:', header)
   if (header && header.startsWith('Bearer')) {
-    const [ , token ] = header.split(' ')
+    const [, token] = header.split(' ')
     const success = verifyJWT(token)
     return success
   }
@@ -137,19 +137,19 @@ app.post('/lobby', async (req, res) => {
   const { game } = req.body
   const header = req.headers['authorization ']
   const success = authenticate(header)
-    if (success) {
-      const entity = await Lobby.create({ game })
-      const lobbys = await Lobby.findAll({ include: [User] })
-      const data = JSON.stringify(lobbys)
-      stream.updateInit(data)
-      stream.send(data)
-      return res.send({ message: 'OK' })
-    }
+  if (success) {
+    const entity = await Lobby.create({ game })
     const lobbys = await Lobby.findAll({ include: [User] })
     const data = JSON.stringify(lobbys)
     stream.updateInit(data)
     stream.send(data)
-    return res.send({ message: 'Not authorized' })
+    return res.send({ message: 'OK' })
+  }
+  const lobbys = await Lobby.findAll({ include: [User] })
+  const data = JSON.stringify(lobbys)
+  stream.updateInit(data)
+  stream.send(data)
+  return res.send({ message: 'Not authorized' })
 })
 
 // user in lobby
