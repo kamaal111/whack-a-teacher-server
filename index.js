@@ -124,6 +124,7 @@ const authenticate = header => {
     })
   }
 
+  console.log('Header:', header)
   if (header && header.startsWith('Bearer')) {
     const [ , token ] = header.split(' ')
     const success = verifyJWT(token)
@@ -136,14 +137,13 @@ app.post('/lobby', async (req, res) => {
   const { game } = req.body
   const header = req.headers['authorization ']
   const success = authenticate(header)
-    console.log(success)
     if (success) {
       const entity = await Lobby.create({ game })
       const lobbys = await Lobby.findAll({ include: [User] })
       const data = JSON.stringify(lobbys)
       stream.updateInit(data)
       stream.send(data)
-      return res.send(entity)
+      return res.send({ message: 'OK' })
     }
     const lobbys = await Lobby.findAll({ include: [User] })
     const data = JSON.stringify(lobbys)
@@ -157,16 +157,24 @@ app.put('/user/:userId', async (req, res) => {
   const { userId } = req.params
   const { id: lobbyId } = req.body
 
-  const userInLobby = await User.findByPk(userId).then(user => {
-    return user.update({ lobbyId })
-  })
-
-  const data = JSON.stringify(userInLobby)
-
+  const header = req.headers['authorization ']
+  const success = authenticate(header)
+  console.log('Success:', success)
+  if (success) {
+    await User.findByPk(userId).then(user => {
+      return user.update({ lobbyId })
+    })
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+    return res.send({ message: 'OK' })
+  }
+  const lobbys = await Lobby.findAll({ include: [User] })
+  const data = JSON.stringify(lobbys)
   stream.updateInit(data)
   stream.send(data)
-
-  res.send(userInLobby)
+  res.send({ message: 'Not authorized' })
 })
 
 app.listen(port, () => console.log(`Listening ${port}`))
