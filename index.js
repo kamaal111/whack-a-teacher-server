@@ -231,6 +231,7 @@ app.put('/user/:userId', async (req, res) => {
 
 app.listen(port, () => console.log(`Listening ${port}`))
 
+// increase score
 app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
   try {
     const { lobbyId, playerId } = req.params
