@@ -29,8 +29,8 @@ const User = db.define('user', {
 
 const Lobby = db.define('lobby', {
   game: Sequelize.STRING,
-  playerOneScore: Sequelize.STRING,
-  playerTwoScore: Sequelize.STRING
+  playerOneScore: Sequelize.INTEGER,
+  playerTwoScore: Sequelize.INTEGER
 })
 
 User.belongsTo(Lobby)
@@ -40,11 +40,15 @@ app.use(cors())
 app.use(bodyParser())
 
 app.get('/stream', async (req, res) => {
-  const lobbys = await Lobby.findAll({ include: [User] })
-  const data = JSON.stringify(lobbys)
+  try {
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
 
-  stream.updateInit(data)
-  stream.init(req, res)
+    stream.updateInit(data)
+    stream.init(req, res)
+  } catch (error) {
+    res.send({ data: error })
+  }
 })
 
 const signJWT = (user, callback) => {
@@ -66,134 +70,158 @@ const signJWT = (user, callback) => {
 
 // Create User
 app.post('/user', async (req, res) => {
-  const { name, password } = req.body
+  try {
+    const { name, password } = req.body
 
-  const findUser = await User.findAll({ where: { name } })
-  const lobbys = await Lobby.findAll({ include: [User] })
+    const findUser = await User.findAll({ where: { name } })
+    const lobbys = await Lobby.findAll({ include: [User] })
 
-  const data = JSON.stringify(lobbys)
+    const data = JSON.stringify(lobbys)
 
-  if (findUser.length > 0) {
-    return res.send({ data: 'BAD REQUEST SIGN UP' })
+    if (findUser.length > 0) {
+      return res.send({ data: 'BAD REQUEST SIGN UP' })
+    }
+
+    const hashingSaltingRounds = 10
+    const user = await User.create({
+      name,
+      password: hashSync(password, hashingSaltingRounds)
+    })
+
+    stream.updateInit(data)
+    stream.send(data)
+
+    return signJWT(user, response => res.send(response))
+  } catch (error) {
+    return res.send({ data: error })
   }
-
-  const hashingSaltingRounds = 10
-  const user = await User.create({
-    name,
-    password: hashSync(password, hashingSaltingRounds)
-  })
-
-  stream.updateInit(data)
-  stream.send(data)
-
-  return signJWT(user, response => res.send(response))
 })
 
 // Login User
 app.post('/login', async (req, res) => {
-  const { name, password } = req.body
+  try {
+    const { name, password } = req.body
 
-  const findUser = await User.findAll({ where: { name } })
+    const findUser = await User.findAll({ where: { name } })
 
-  const lobbys = await Lobby.findAll({ include: [User] })
-  const data = JSON.stringify(lobbys)
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
 
-  stream.updateInit(data)
-  stream.send(data)
+    stream.updateInit(data)
+    stream.send(data)
 
-  if (findUser.length > 0) {
-    const [user] = findUser
+    if (findUser.length > 0) {
+      const [user] = findUser
 
-    return compare(password, user.password, (_err, response) => {
-      if (response === false) {
-        return res.send({ data: 'BAD REQUEST LOGIN' })
-      }
+      return compare(password, user.password, (_err, response) => {
+        if (response === false) {
+          return res.send({ data: 'BAD REQUEST LOGIN' })
+        }
 
-      return signJWT(user, response => {
-        console.log('response', response)
-        return res.send(response)
+        return signJWT(user, response => {
+          console.log('response', response)
+          return res.send(response)
+        })
       })
-    })
-  }
+    }
 
-  return res.send({ data: 'BAD REQUEST LOGIN' })
+    return res.send({ data: 'BAD REQUEST LOGIN' })
+  } catch (error) {
+    return res.send({ data: error })
+  }
 })
 
 // create lobby
 app.post('/lobby', async (req, res) => {
-  const { game } = req.body
+  try {
+    const { game } = req.body
 
-  const authorization = req.header('authorization')
+    const authorization = req.header('authorization')
 
-  if (authorization && authorization.startsWith('Bearer')) {
-    const [, token] = authorization.split(' ')
+    if (authorization && authorization.startsWith('Bearer')) {
+      const [, token] = authorization.split(' ')
 
-    return verify(
-      token,
-      process.env.SECRET_KEY || 'SupeRSecretOne',
-      { expiresIn: '1d' },
-      async (err, decode) => {
-        if (err || !decode) return res.send({ data: 'BAD REQUEST' })
+      return verify(
+        token,
+        process.env.SECRET_KEY || 'SupeRSecretOne',
+        { expiresIn: '1d' },
+        async (err, decode) => {
+          try {
+            if (err || !decode) return res.send({ data: 'BAD REQUEST' })
 
-        await Lobby.create({ game })
-        const lobbys = await Lobby.findAll({ include: [User] })
+            await Lobby.create({ game })
+            const lobbys = await Lobby.findAll({ include: [User] })
 
-        const data = JSON.stringify(lobbys)
-        stream.updateInit(data)
-        stream.send(data)
+            const data = JSON.stringify(lobbys)
+            stream.updateInit(data)
+            stream.send(data)
 
-        return res.send({ data: 'OK' })
-      }
-    )
+            return res.send({ data: 'OK' })
+          } catch (error) {
+            return res.send({ data: error })
+          }
+        }
+      )
+    }
+
+    const lobbys = await Lobby.findAll({ include: [User] })
+
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+
+    return res.send({ data: 'BAD REQUEST' })
+  } catch (error) {
+    return res.send({ data: error })
   }
-
-  const lobbys = await Lobby.findAll({ include: [User] })
-
-  const data = JSON.stringify(lobbys)
-  stream.updateInit(data)
-  stream.send(data)
-
-  return res.send({ data: 'BAD REQUEST' })
 })
 
 // user in lobby
 app.put('/user/:userId', async (req, res) => {
-  const { userId } = req.params
-  const { id: lobbyId } = req.body
+  try {
+    const { userId } = req.params
+    const { id: lobbyId } = req.body
 
-  const authorization = req.header('authorization')
+    const authorization = req.header('authorization')
 
-  if (authorization && authorization.startsWith('Bearer')) {
-    const [, token] = authorization.split(' ')
+    if (authorization && authorization.startsWith('Bearer')) {
+      const [, token] = authorization.split(' ')
 
-    return verify(
-      token,
-      process.env.SECRET_KEY || 'SupeRSecretOne',
-      { expiresIn: '1d' },
-      async (err, decode) => {
-        if (err || !decode) return res.send({ data: 'BAD REQUEST' })
+      return verify(
+        token,
+        process.env.SECRET_KEY || 'SupeRSecretOne',
+        { expiresIn: '1d' },
+        async (err, decode) => {
+          try {
+            if (err || !decode) return res.send({ data: 'BAD REQUEST' })
 
-        const user = await User.findByPk(userId)
-        await user.update({ lobbyId })
+            const user = await User.findByPk(userId)
+            await user.update({ lobbyId })
 
-        const lobbys = await Lobby.findAll({ include: [User] })
+            const lobbys = await Lobby.findAll({ include: [User] })
 
-        const data = JSON.stringify(lobbys)
-        stream.updateInit(data)
-        stream.send(data)
+            const data = JSON.stringify(lobbys)
+            stream.updateInit(data)
+            stream.send(data)
 
-        return res.send({ data: 'OK' })
-      }
-    )
+            return res.send({ data: 'OK' })
+          } catch (error) {
+            return res.send({ data: error })
+          }
+        }
+      )
+    }
+
+    const lobbys = await Lobby.findAll({ include: [User] })
+
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+
+    return res.send({ data: 'BAD REQUEST' })
+  } catch (error) {
+    return res.send({ data: error })
   }
-
-  const lobbys = await Lobby.findAll({ include: [User] })
-
-  const data = JSON.stringify(lobbys)
-  stream.updateInit(data)
-  stream.send(data)
-
-  return res.send({ data: 'BAD REQUEST' })
 })
 
 app.listen(port, () => console.log(`Listening ${port}`))
