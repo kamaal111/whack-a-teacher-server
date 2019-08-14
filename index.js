@@ -231,7 +231,7 @@ app.put('/user/:userId', async (req, res) => {
 
 app.listen(port, () => console.log(`Listening ${port}`))
 
-// increase score
+// Increase score
 app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
   try {
     const { lobbyId, playerId } = req.params
@@ -261,6 +261,52 @@ app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
     }
     const updateScore = increaseScore(Number(playerId))
     updateScore()
+
+  } catch (error) {
+    return res.end({ data: error })
+  }
+})
+
+// Reset lobby (when both click rematch)
+app.put('/game/:lobbyId/rematch', async (req, res) => {
+  try {
+    const { lobbyId } = req.params
+    const lobby = await Lobby.findByPk(lobbyId)
+
+    const resetLobby = async () => {
+      await lobby.update({ playerOneScore: null, playerTwoScore: null })
+
+      const lobbys = await Lobby.findAll({ include: [User] })
+      const data = JSON.stringify(lobbys)
+      stream.updateInit(data)
+      stream.send(data) 
+
+      return res.send({ lobby })
+    }
+
+    resetLobby()
+
+  } catch (error) {
+    return res.end({ data: error })
+  }
+})
+
+// Delete lobby
+app.delete('/games/:lobbyId', async (req, res) => {
+  try {
+    const { lobbyId } = req.params
+    Lobby.destroy({
+      where: {
+        id: lobbyId
+      }
+    })
+
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+
+    return res.send({ message: 'OK' })
 
   } catch (error) {
     return res.end({ data: error })
