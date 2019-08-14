@@ -28,7 +28,9 @@ const User = db.define('user', {
 })
 
 const Lobby = db.define('lobby', {
-  game: Sequelize.STRING
+  game: Sequelize.STRING,
+  playerOneScore: Sequelize.STRING,
+  playerTwoScore: Sequelize.STRING
 })
 
 User.belongsTo(Lobby)
