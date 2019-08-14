@@ -33,7 +33,9 @@ const Lobby = db.define('lobby', {
   game: Sequelize.STRING,
   playerOneScore: Sequelize.INTEGER,
   playerTwoScore: Sequelize.INTEGER
-})
+},
+  { timestamps: false }
+)
 
 User.belongsTo(Lobby)
 Lobby.hasMany(User)
