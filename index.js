@@ -25,13 +25,13 @@ db.sync({ force: false })
 const User = db.define('user', {
   name: Sequelize.STRING,
   password: Sequelize.STRING
-})
+}, { timestamps: false })
 
 const Lobby = db.define('lobby', {
   game: Sequelize.STRING,
   playerOneScore: Sequelize.STRING,
   playerTwoScore: Sequelize.STRING
-})
+}, { timestamps: false })
 
 User.belongsTo(Lobby)
 Lobby.hasMany(User)
