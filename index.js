@@ -16,8 +16,6 @@ const databaseUrl =
 
 const db = new Sequelize(databaseUrl)
 
-// require('dotenv').config()
-
 db.sync({ force: false })
   .then(() => console.log('Database connected'))
   .catch(console.error)
