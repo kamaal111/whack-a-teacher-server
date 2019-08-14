@@ -22,10 +22,14 @@ db.sync({ force: false })
   .then(() => console.log('Database connected'))
   .catch(console.error)
 
-const User = db.define('user', {
-  name: Sequelize.STRING,
-  password: Sequelize.STRING
-})
+const User = db.define(
+  'user',
+  {
+    name: Sequelize.STRING,
+    password: Sequelize.STRING
+  },
+  { timestamps: false }
+)
 
 const Lobby = db.define('lobby', {
   game: Sequelize.STRING,
@@ -118,10 +122,7 @@ app.post('/login', async (req, res) => {
           return res.send({ data: 'BAD REQUEST LOGIN' })
         }
 
-        return signJWT(user, response => {
-          console.log('response', response)
-          return res.send(response)
-        })
+        return signJWT(user, response => res.send(response))
       })
     }
 
