@@ -229,3 +229,26 @@ app.put('/user/:userId', async (req, res) => {
 })
 
 app.listen(port, () => console.log(`Listening ${port}`))
+
+app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
+  try {
+    const { lobbyId, playerId } = req.params
+    const { score } = req.body
+    const lobby = await Lobby.findByPk(lobbyId)
+    
+    const increaseScore = async id => {
+      if (id === 1) {
+        await lobby.update({ playerOneScore: Number(score) })
+        return res.send({ lobby })
+      } else if (id === 2) {
+        await lobby.update({ playerTwoScore: Number(score) })
+        return res.send({ lobby })
+      }
+    }
+    const updateScore = increaseScore(Number(playerId))
+    updateScore()
+
+  } catch (error) {
+    return res.end({ data: error })
+  }
+})
