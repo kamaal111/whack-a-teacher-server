@@ -148,7 +148,8 @@ app.post('/lobby', async (req, res) => {
         { expiresIn: '1d' },
         async (err, decode) => {
           try {
-            if (err || !decode) return res.send({ data: 'BAD REQUEST' })
+            if (err || !decode)
+              return res.send({ data: 'IN VERIFY BAD REQUEST' })
 
             await Lobby.create({ game })
             const lobbys = await Lobby.findAll({ include: [User] })
@@ -171,7 +172,7 @@ app.post('/lobby', async (req, res) => {
     stream.updateInit(data)
     stream.send(data)
 
-    return res.send({ data: 'BAD REQUEST' })
+    return res.send({ data: 'OUTSIDE VERIFY BAD REQUEST' })
   } catch (error) {
     return res.send({ data: error })
   }
