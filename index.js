@@ -16,8 +16,6 @@ const databaseUrl =
 
 const db = new Sequelize(databaseUrl)
 
-// require('dotenv').config()
-
 db.sync({ force: false })
   .then(() => console.log('Database connected'))
   .catch(console.error)
@@ -31,11 +29,13 @@ const User = db.define(
   { timestamps: false }
 )
 
-const Lobby = db.define('lobby', {
-  game: Sequelize.STRING,
-  playerOneScore: Sequelize.INTEGER,
-  playerTwoScore: Sequelize.INTEGER
-},
+const Lobby = db.define(
+  'lobby',
+  {
+    game: Sequelize.STRING,
+    playerOneScore: Sequelize.INTEGER,
+    playerTwoScore: Sequelize.INTEGER
+  },
   { timestamps: false }
 )
 
@@ -149,6 +149,7 @@ app.post('/lobby', async (req, res) => {
         process.env.SECRET_KEY || 'SupeRSecretOne',
         { expiresIn: '1d' },
         async (err, decode) => {
+          console.log(decode)
           try {
             if (err || !decode)
               return res.send({ data: 'IN VERIFY BAD REQUEST' })
