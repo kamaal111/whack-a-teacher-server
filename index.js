@@ -241,9 +241,21 @@ app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
     const increaseScore = async id => {
       if (id === 1) {
         await lobby.update({ playerOneScore: Number(score) })
+        
+        const lobbys = await Lobby.findAll({ include: [User] })
+        const data = JSON.stringify(lobbys)
+        stream.updateInit(data)
+        stream.send(data)
+        
         return res.send({ lobby })
       } else if (id === 2) {
         await lobby.update({ playerTwoScore: Number(score) })
+        
+        const lobbys = await Lobby.findAll({ include: [User] })
+        const data = JSON.stringify(lobbys)
+        stream.updateInit(data)
+        stream.send(data)
+
         return res.send({ lobby })
       }
     }
