@@ -51,7 +51,7 @@ const signJWT = (user, callback) => {
   const options = { expiresIn: '1d' }
 
   sign(payload, secret, options, (err, jwt) => {
-    if (err) return callback({ data: 'BAD REQUEST' })
+    if (err) return callback({ data: 'BAD REQUEST JWT' })
 
     return callback({
       data: 'OK',
@@ -72,7 +72,7 @@ app.post('/user', async (req, res) => {
   const data = JSON.stringify(lobbys)
 
   if (findUser.length > 0) {
-    return res.send({ data: 'BAD REQUEST' })
+    return res.send({ data: 'BAD REQUEST SIGN UP' })
   }
 
   const hashingSaltingRounds = 10
@@ -104,7 +104,7 @@ app.post('/login', async (req, res) => {
 
     return compare(password, user.password, (_err, response) => {
       if (response === false) {
-        return res.send({ data: 'BAD REQUEST' })
+        return res.send({ data: 'BAD REQUEST LOGIN' })
       }
 
       return signJWT(user, response => {
@@ -114,49 +114,44 @@ app.post('/login', async (req, res) => {
     })
   }
 
-  return res.send({ data: 'BAD REQUEST' })
+  return res.send({ data: 'BAD REQUEST LOGIN' })
 })
-
-// Authenticate header
-const authenticate = header => {
-  const verifyJWT = token => {
-    return verify(
-      token,
-      process.env.SECRET_KEY || 'SupeRSecretOne',
-      { expiresIn: '1d' },
-      (err, decode) => {
-        if (err !== null) return false
-        if (decode) return true
-      }
-    )
-  }
-
-  console.log('Header:', header)
-  if (header && header.startsWith('Bearer')) {
-    const [, token] = header.split(' ')
-    const success = verifyJWT(token)
-    return success
-  }
-}
 
 // create lobby
 app.post('/lobby', async (req, res) => {
   const { game } = req.body
-  const header = req.headers['authorization ']
-  const success = authenticate(header)
-  if (success) {
-    const entity = await Lobby.create({ game })
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
-    return res.send({ message: 'OK' })
+
+  const authorization = req.header('authorization')
+
+  if (authorization && authorization.startsWith('Bearer')) {
+    const [, token] = authorization.split(' ')
+
+    return verify(
+      token,
+      process.env.SECRET_KEY || 'SupeRSecretOne',
+      { expiresIn: '1d' },
+      async (err, decode) => {
+        if (err || !decode) return res.send({ data: 'BAD REQUEST' })
+
+        await Lobby.create({ game })
+        const lobbys = await Lobby.findAll({ include: [User] })
+
+        const data = JSON.stringify(lobbys)
+        stream.updateInit(data)
+        stream.send(data)
+
+        return res.send({ data: 'OK' })
+      }
+    )
   }
+
   const lobbys = await Lobby.findAll({ include: [User] })
+
   const data = JSON.stringify(lobbys)
   stream.updateInit(data)
   stream.send(data)
-  return res.send({ message: 'Not authorized' })
+
+  return res.send({ data: 'BAD REQUEST' })
 })
 
 // user in lobby
@@ -197,25 +192,6 @@ app.put('/user/:userId', async (req, res) => {
   stream.send(data)
 
   return res.send({ data: 'BAD REQUEST' })
-
-  // const header = req.headers['authorization ']
-  // const success = authenticate(header)
-  // console.log('Success:', success)
-  // if (success) {
-  //   await User.findByPk(userId).then(user => {
-  //     return user.update({ lobbyId })
-  //   })
-  //   const lobbys = await Lobby.findAll({ include: [User] })
-  //   const data = JSON.stringify(lobbys)
-  //   stream.updateInit(data)
-  //   stream.send(data)
-  //   return res.send({ message: 'OK' })
-  // }
-  // const lobbys = await Lobby.findAll({ include: [User] })
-  // const data = JSON.stringify(lobbys)
-  // stream.updateInit(data)
-  // stream.send(data)
-  // res.send({ message: 'Not authorized' })
 })
 
 app.listen(port, () => console.log(`Listening ${port}`))
