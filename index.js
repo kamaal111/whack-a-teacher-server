@@ -230,3 +230,83 @@ app.put('/user/:userId', async (req, res) => {
 })
 
 app.listen(port, () => console.log(`Listening ${port}`))
+
+// Increase score
+app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
+  try {
+    const { lobbyId, playerId } = req.params
+    const { score } = req.body
+    const lobby = await Lobby.findByPk(lobbyId)
+
+    const increaseScore = async id => {
+      if (id === 1) {
+        await lobby.update({ playerOneScore: Number(score) })
+
+        const lobbys = await Lobby.findAll({ include: [User] })
+
+        const data = JSON.stringify(lobbys)
+        stream.updateInit(data)
+        stream.send(data)
+
+        return res.send({ score: lobby.playerOneScore })
+      } else if (id === 2) {
+        await lobby.update({ playerTwoScore: Number(score) })
+
+        const lobbys = await Lobby.findAll({ include: [User] })
+        const data = JSON.stringify(lobbys)
+        stream.updateInit(data)
+        stream.send(data)
+
+        return res.send({ score: lobby.playerTwoScore })
+      }
+    }
+    const updateScore = increaseScore(Number(playerId))
+    return updateScore()
+  } catch (error) {
+    return res.send({ data: error })
+  }
+})
+
+// Reset lobby (when both click rematch)
+app.put('/game/:lobbyId/rematch', async (req, res) => {
+  try {
+    const { lobbyId } = req.params
+    const lobby = await Lobby.findByPk(lobbyId)
+
+    const resetLobby = async () => {
+      await lobby.update({ playerOneScore: null, playerTwoScore: null })
+
+      const lobbys = await Lobby.findAll({ include: [User] })
+      const data = JSON.stringify(lobbys)
+      stream.updateInit(data)
+      stream.send(data)
+
+      return res.send({ lobby })
+    }
+
+    resetLobby()
+  } catch (error) {
+    return res.end({ data: error })
+  }
+})
+
+// Delete lobby
+app.delete('/games/:lobbyId', async (req, res) => {
+  try {
+    const { lobbyId } = req.params
+    Lobby.destroy({
+      where: {
+        id: lobbyId
+      }
+    })
+
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+
+    return res.send({ message: 'OK' })
+  } catch (error) {
+    return res.end({ data: error })
+  }
+})
