@@ -16,7 +16,7 @@ const databaseUrl =
 
 const db = new Sequelize(databaseUrl)
 
-require('dotenv').config()
+// require('dotenv').config()
 
 db.sync({ force: false })
   .then(() => console.log('Database connected'))
@@ -47,7 +47,7 @@ app.get('/stream', async (req, res) => {
 
 const signJWT = (user, callback) => {
   const payload = { name: user.name }
-  const secret = process.env.SECRET_KEY
+  const secret = process.env.SECRET_KEY || 'SupeRSecretOne'
   const options = { expiresIn: '1d' }
 
   sign(payload, secret, options, (err, jwt) => {
@@ -122,7 +122,7 @@ const authenticate = header => {
   const verifyJWT = token => {
     return verify(
       token,
-      process.env.SECRET_KEY,
+      process.env.SECRET_KEY || 'SupeRSecretOne',
       { expiresIn: '1d' },
       (err, decode) => {
         if (err !== null) return false
@@ -144,19 +144,19 @@ app.post('/lobby', async (req, res) => {
   const { game } = req.body
   const header = req.headers['authorization ']
   const success = authenticate(header)
-  // if (success) {
-  const entity = await Lobby.create({ game })
+  if (success) {
+    const entity = await Lobby.create({ game })
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+    return res.send({ message: 'OK' })
+  }
   const lobbys = await Lobby.findAll({ include: [User] })
   const data = JSON.stringify(lobbys)
   stream.updateInit(data)
   stream.send(data)
-  return res.send({ message: 'OK' })
-  // }
-  // const lobbys = await Lobby.findAll({ include: [User] })
-  // const data = JSON.stringify(lobbys)
-  // stream.updateInit(data)
-  // stream.send(data)
-  // return res.send({ message: 'Not authorized' })
+  return res.send({ message: 'Not authorized' })
 })
 
 // user in lobby
@@ -164,18 +164,52 @@ app.put('/user/:userId', async (req, res) => {
   const { userId } = req.params
   const { id: lobbyId } = req.body
 
-  const header = req.headers['authorization ']
-  const success = authenticate(header)
-  console.log('Success:', success)
-  // if (success) {
-  await User.findByPk(userId).then(user => {
-    return user.update({ lobbyId })
-  })
+  const authorization = req.header('authorization')
+
+  if (authorization && authorization.startsWith('Bearer')) {
+    const [, token] = authorization.split(' ')
+
+    return verify(
+      token,
+      process.env.SECRET_KEY || 'SupeRSecretOne',
+      { expiresIn: '1d' },
+      async (err, decode) => {
+        if (err || !decode) return res.send({ data: 'BAD REQUEST' })
+
+        const user = await User.findByPk(userId)
+        await user.update({ lobbyId })
+
+        const lobbys = await Lobby.findAll({ include: [User] })
+
+        const data = JSON.stringify(lobbys)
+        stream.updateInit(data)
+        stream.send(data)
+
+        return res.send({ data: 'OK' })
+      }
+    )
+  }
+
   const lobbys = await Lobby.findAll({ include: [User] })
+
   const data = JSON.stringify(lobbys)
   stream.updateInit(data)
   stream.send(data)
-  return res.send({ message: 'OK' })
+
+  return res.send({ data: 'BAD REQUEST' })
+
+  // const header = req.headers['authorization ']
+  // const success = authenticate(header)
+  // console.log('Success:', success)
+  // if (success) {
+  //   await User.findByPk(userId).then(user => {
+  //     return user.update({ lobbyId })
+  //   })
+  //   const lobbys = await Lobby.findAll({ include: [User] })
+  //   const data = JSON.stringify(lobbys)
+  //   stream.updateInit(data)
+  //   stream.send(data)
+  //   return res.send({ message: 'OK' })
   // }
   // const lobbys = await Lobby.findAll({ include: [User] })
   // const data = JSON.stringify(lobbys)
