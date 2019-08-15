@@ -229,7 +229,51 @@ app.put('/user/:userId', async (req, res) => {
   }
 })
 
-app.listen(port, () => console.log(`Listening ${port}`))
+app.put('/user/:userId/remove', async (req, res) => {
+  try {
+    const { userId } = req.params
+
+    const authorization = req.header('authorization')
+
+    if (authorization && authorization.startsWith('Bearer')) {
+      const [, token] = authorization.split(' ')
+
+      return verify(
+        token,
+        process.env.SECRET_KEY || 'SupeRSecretOne',
+        { expiresIn: '1d' },
+        async (err, decode) => {
+          try {
+            if (err || !decode) return res.send({ data: 'BAD REQUEST' })
+
+            const user = await User.findByPk(userId)
+            await user.update({ lobbyId: null })
+
+            const lobbys = await Lobby.findAll({ include: [User] })
+
+            const data = JSON.stringify(lobbys)
+            stream.updateInit(data)
+            stream.send(data)
+
+            return res.send({ data: 'OK' })
+          } catch (error) {
+            return res.send({ data: error })
+          }
+        }
+      )
+    }
+
+    const lobbys = await Lobby.findAll({ include: [User] })
+
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
+
+    return res.send({ data: 'BAD REQUEST' })
+  } catch (error) {
+    return res.send({ data: error })
+  }
+})
 
 // Increase score
 app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
@@ -304,3 +348,5 @@ app.delete('/games/:lobbyId', async (req, res) => {
     return res.end({ data: error })
   }
 })
+
+app.listen(port, () => console.log(`Listening ${port}`))
