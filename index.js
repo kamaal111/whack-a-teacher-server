@@ -291,8 +291,16 @@ app.put('/game/:lobbyId/rematch', async (req, res) => {
 app.delete('/games/:lobbyId', async (req, res) => {
   try {
     const { lobbyId } = req.params
+<<<<<<< HEAD
 
     Lobby.destroy({ where: { id: lobbyId } })
+=======
+    await Lobby.destroy({
+      where: {
+        id: lobbyId
+      }
+    })
+>>>>>>> b6164a91414270bcb7a94d3a4c246c7b7d873e84
 
     const lobbys = await Lobby.findAll({ include: [User] })
     const data = JSON.stringify(lobbys)
