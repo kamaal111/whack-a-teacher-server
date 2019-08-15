@@ -248,7 +248,7 @@ app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
         stream.updateInit(data)
         stream.send(data)
 
-        return res.send({ score: lobby.playerOneScore })
+        return res.send({ data: lobby.playerOneScore })
       } else if (id === 2) {
         await lobby.update({ playerTwoScore: Number(score) })
 
@@ -257,7 +257,7 @@ app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
         stream.updateInit(data)
         stream.send(data)
 
-        return res.send({ score: lobby.playerTwoScore })
+        return res.send({ data: lobby.playerTwoScore })
       }
     }
     const updateScore = increaseScore(Number(playerId))
@@ -271,20 +271,17 @@ app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
 app.put('/game/:lobbyId/rematch', async (req, res) => {
   try {
     const { lobbyId } = req.params
+
     const lobby = await Lobby.findByPk(lobbyId)
 
-    const resetLobby = async () => {
-      await lobby.update({ playerOneScore: null, playerTwoScore: null })
+    await lobby.update({ playerOneScore: null, playerTwoScore: null })
 
-      const lobbys = await Lobby.findAll({ include: [User] })
-      const data = JSON.stringify(lobbys)
-      stream.updateInit(data)
-      stream.send(data)
+    const lobbys = await Lobby.findAll({ include: [User] })
+    const data = JSON.stringify(lobbys)
+    stream.updateInit(data)
+    stream.send(data)
 
-      return res.send({ lobby })
-    }
-
-    resetLobby()
+    return res.send({ data: lobby })
   } catch (error) {
     return res.end({ data: error })
   }
@@ -294,18 +291,15 @@ app.put('/game/:lobbyId/rematch', async (req, res) => {
 app.delete('/games/:lobbyId', async (req, res) => {
   try {
     const { lobbyId } = req.params
-    Lobby.destroy({
-      where: {
-        id: lobbyId
-      }
-    })
+
+    Lobby.destroy({ where: { id: lobbyId } })
 
     const lobbys = await Lobby.findAll({ include: [User] })
     const data = JSON.stringify(lobbys)
     stream.updateInit(data)
     stream.send(data)
 
-    return res.send({ message: 'OK' })
+    return res.send({ data: 'OK' })
   } catch (error) {
     return res.end({ data: error })
   }
