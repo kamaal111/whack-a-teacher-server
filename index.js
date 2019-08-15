@@ -294,7 +294,7 @@ app.put('/game/:lobbyId/rematch', async (req, res) => {
 app.delete('/games/:lobbyId', async (req, res) => {
   try {
     const { lobbyId } = req.params
-    Lobby.destroy({
+    await Lobby.destroy({
       where: {
         id: lobbyId
       }
