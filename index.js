@@ -2,49 +2,28 @@ const express = require('express')
 const Sse = require('json-sse')
 const cors = require('cors')
 const { json: bodyParser } = require('body-parser')
-const Sequelize = require('sequelize')
 const { hashSync, compare } = require('bcrypt')
-const { sign, verify } = require('jsonwebtoken')
+const { verify } = require('jsonwebtoken')
+
+const { User, Lobby } = require('./models')
+const { signJWT } = require('./auth')
 
 const app = express()
 const stream = new Sse()
 const port = process.env.PORT || 5000
 
-const databaseUrl =
-  process.env.DATABASE_URL ||
-  'postgres://postgres:password@localhost:5432/postgres'
-
-const db = new Sequelize(databaseUrl)
-
-db.sync({ force: false })
-  .then(() => console.log('Database connected'))
-  .catch(console.error)
-
-const User = db.define(
-  'user',
-  {
-    name: Sequelize.STRING,
-    password: Sequelize.STRING
-  },
-  { timestamps: false }
-)
-
-const Lobby = db.define(
-  'lobby',
-  {
-    game: Sequelize.STRING,
-    playerOneScore: Sequelize.INTEGER,
-    playerTwoScore: Sequelize.INTEGER
-  },
-  { timestamps: false }
-)
-
-User.belongsTo(Lobby)
-Lobby.hasMany(User)
-
 app.use(cors())
 app.use(bodyParser())
 
+const findAllLobbiesAndStream = async stream => {
+  const lobbys = await Lobby.findAll({ include: [User] })
+  const data = JSON.stringify(lobbys)
+
+  stream.updateInit(data)
+  stream.send(data)
+}
+
+// Initilize Stream
 app.get('/stream', async (req, res) => {
   try {
     const lobbys = await Lobby.findAll({ include: [User] })
@@ -57,34 +36,15 @@ app.get('/stream', async (req, res) => {
   }
 })
 
-const signJWT = (user, callback) => {
-  const payload = { name: user.name }
-  const secret = process.env.SECRET_KEY || 'SupeRSecretOne'
-  const options = { expiresIn: '1d' }
-
-  sign(payload, secret, options, (err, jwt) => {
-    if (err) return callback({ data: 'BAD REQUEST JWT' })
-
-    return callback({
-      data: 'OK',
-      name: user.name,
-      id: user.id,
-      token: jwt
-    })
-  })
-}
-
-// Create User
+// Create User Route
 app.post('/user', async (req, res) => {
   try {
     const { name, password } = req.body
 
     const findUser = await User.findAll({ where: { name } })
-    const lobbys = await Lobby.findAll({ include: [User] })
-
-    const data = JSON.stringify(lobbys)
 
     if (findUser.length > 0) {
+      findAllLobbiesAndStream(stream)
       return res.send({ data: 'BAD REQUEST SIGN UP' })
     }
 
@@ -94,8 +54,7 @@ app.post('/user', async (req, res) => {
       password: hashSync(password, hashingSaltingRounds)
     })
 
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream()
 
     return signJWT(user, response => res.send(response))
   } catch (error) {
@@ -103,23 +62,21 @@ app.post('/user', async (req, res) => {
   }
 })
 
-// Login User
+// Login User Route
 app.post('/login', async (req, res) => {
   try {
     const { name, password } = req.body
 
     const findUser = await User.findAll({ where: { name } })
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-
-    stream.updateInit(data)
-    stream.send(data)
-
     if (findUser.length > 0) {
       const [user] = findUser
 
-      return compare(password, user.password, (_err, response) => {
+      findAllLobbiesAndStream(stream)
+
+      return compare(password, user.password, (err, response) => {
+        if (err) return res.send({ data: err })
+
         if (response === false) {
           return res.send({ data: 'BAD REQUEST LOGIN' })
         }
@@ -127,6 +84,8 @@ app.post('/login', async (req, res) => {
         return signJWT(user, response => res.send(response))
       })
     }
+
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: 'BAD REQUEST LOGIN' })
   } catch (error) {
@@ -149,17 +108,13 @@ app.post('/lobby', async (req, res) => {
         process.env.SECRET_KEY || 'SupeRSecretOne',
         { expiresIn: '1d' },
         async (err, decode) => {
-          console.log(decode)
           try {
             if (err || !decode)
               return res.send({ data: 'IN VERIFY BAD REQUEST' })
 
             await Lobby.create({ game })
-            const lobbys = await Lobby.findAll({ include: [User] })
 
-            const data = JSON.stringify(lobbys)
-            stream.updateInit(data)
-            stream.send(data)
+            findAllLobbiesAndStream(stream)
 
             return res.send({ data: 'OK' })
           } catch (error) {
@@ -169,11 +124,7 @@ app.post('/lobby', async (req, res) => {
       )
     }
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: 'OUTSIDE VERIFY BAD REQUEST' })
   } catch (error) {
@@ -203,11 +154,7 @@ app.put('/user/:userId', async (req, res) => {
             const user = await User.findByPk(userId)
             await user.update({ lobbyId })
 
-            const lobbys = await Lobby.findAll({ include: [User] })
-
-            const data = JSON.stringify(lobbys)
-            stream.updateInit(data)
-            stream.send(data)
+            findAllLobbiesAndStream(stream)
 
             return res.send({ data: 'OK' })
           } catch (error) {
@@ -217,11 +164,7 @@ app.put('/user/:userId', async (req, res) => {
       )
     }
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: 'BAD REQUEST' })
   } catch (error) {
@@ -249,11 +192,7 @@ app.put('/user/:userId/remove', async (req, res) => {
             const user = await User.findByPk(userId)
             await user.update({ lobbyId: null })
 
-            const lobbys = await Lobby.findAll({ include: [User] })
-
-            const data = JSON.stringify(lobbys)
-            stream.updateInit(data)
-            stream.send(data)
+            findAllLobbiesAndStream(stream)
 
             return res.send({ data: 'OK' })
           } catch (error) {
@@ -263,11 +202,7 @@ app.put('/user/:userId/remove', async (req, res) => {
       )
     }
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: 'BAD REQUEST' })
   } catch (error) {
@@ -285,21 +220,14 @@ app.put('/game/:lobbyId/score/:playerId', async (req, res) => {
     if (Number(playerId) === 1) {
       await lobby.update({ playerOneScore: Number(score) })
 
-      const lobbys = await Lobby.findAll({ include: [User] })
-
-      const data = JSON.stringify(lobbys)
-      stream.updateInit(data)
-      stream.send(data)
+      findAllLobbiesAndStream(stream)
 
       return res.send({ data: lobby.playerOneScore })
     }
 
     await lobby.update({ playerTwoScore: Number(score) })
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: lobby.playerTwoScore })
   } catch (error) {
@@ -316,10 +244,7 @@ app.put('/game/:lobbyId/rematch', async (req, res) => {
 
     await lobby.update({ playerOneScore: null, playerTwoScore: null })
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: lobby })
   } catch (error) {
@@ -334,10 +259,7 @@ app.delete('/games/:lobbyId', async (req, res) => {
 
     Lobby.destroy({ where: { id: lobbyId } })
 
-    const lobbys = await Lobby.findAll({ include: [User] })
-    const data = JSON.stringify(lobbys)
-    stream.updateInit(data)
-    stream.send(data)
+    findAllLobbiesAndStream(stream)
 
     return res.send({ data: 'OK' })
   } catch (error) {
