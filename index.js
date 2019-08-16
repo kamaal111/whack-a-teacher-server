@@ -8,7 +8,7 @@ const { sign, verify } = require('jsonwebtoken')
 
 const app = express()
 const stream = new Sse()
-const port = process.env.PORT || 4000
+const port = process.env.PORT || 5000
 
 const databaseUrl =
   process.env.DATABASE_URL ||
